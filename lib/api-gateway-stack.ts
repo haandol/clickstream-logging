@@ -18,18 +18,20 @@ export class ApiGatewayStack extends cdk.Stack {
 
     const ns =  scope.node.tryGetContext('ns');
 
-    const format = `{
-      "requestId": "$context.requestId",
-      "ip": "$context.identity.sourceIp",
-      "caller": "$context.identity.caller",
-      "user": "$context.identity.user",
-      "requestTime": "$context.requestTime",
-      "httpMethod": "$context.httpMethod",
-      "resourcePath": "$context.resourcePath",
-      "status": "$context.status",
-      "protocol": "$context.protocol",
-      "responseLength": "$context.responseLength" 
-    }`.replace(/\n/gm, '');
+    const format = JSON.stringify({
+      "params": "$input.params()",
+      "body" : "$input.json('$')",
+      "stage" : apigw.AccessLogField.contextStage(),
+      "request_id": apigw.AccessLogField.contextRequestId(),
+      "resource_path": apigw.AccessLogField.contextResourcePath(),
+      "http_method": apigw.AccessLogField.contextHttpMethod(),
+      "source_ip": apigw.AccessLogField.contextIdentitySourceIp(),
+      "error": apigw.AccessLogField.contextErrorMessage(),
+      "user-agent": apigw.AccessLogField.contextIdentityUserAgent(),
+      "response_length": apigw.AccessLogField.contextResponseLength(),
+      "reponse_latency": apigw.AccessLogField.contextResponseLatency(),
+      "integration_latency": apigw.AccessLogField.contextIntegrationLatency(),
+    });
     const hoseLogGroup = logs.LogGroup.fromLogGroupArn(this, `${ns}HoseLogGroup`, props.hose.attrArn);
     this.api = new apigw.RestApi(this, `${ns}RestApi`, {
       restApiName: `${ns}RestApi`,
@@ -38,6 +40,8 @@ export class ApiGatewayStack extends cdk.Stack {
         stageName: 'dev',
         accessLogDestination: new apigw.LogGroupLogDestination(hoseLogGroup),
         accessLogFormat: apigw.AccessLogFormat.custom(format),
+        metricsEnabled: true,
+        dataTraceEnabled: true,
         loggingLevel: apigw.MethodLoggingLevel.INFO,
       },
       endpointConfiguration: {
@@ -51,6 +55,7 @@ export class ApiGatewayStack extends cdk.Stack {
         {
           statusCode: '200',
           responseModels: {
+            'application/x-amz-json-1.1': apigw.Model.EMPTY_MODEL,
             'application/json': apigw.Model.EMPTY_MODEL,
           },
         }
@@ -60,12 +65,15 @@ export class ApiGatewayStack extends cdk.Stack {
       code: Code.fromAsset(path.resolve(__dirname, 'functions')),
       handler: 'echo.handler',
       runtime: lambda.Runtime.PYTHON_3_7,
-      timeout: cdk.Duration.minutes(1),
+      timeout: cdk.Duration.seconds(3),
     });
     this.api.root.addMethod('GET', new apigw.LambdaIntegration(f, {
       proxy: false,
       passthroughBehavior: apigw.PassthroughBehavior.NEVER,
       requestTemplates: {
+        'application/x-amz-json-1.1': JSON.stringify({
+          "text": "$input.params('text')",
+        }),
         'application/json': JSON.stringify({
           "text": "$input.params('text')",
         }),
