@@ -3,19 +3,23 @@ import * as cdk from '@aws-cdk/core';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as iam from '@aws-cdk/aws-iam';
 import * as lambda from '@aws-cdk/aws-lambda';
+import * as kinesis from '@aws-cdk/aws-kinesis';
 import * as firehose from '@aws-cdk/aws-kinesisfirehose';
 
 export class KinesisStack extends cdk.Stack {
+  public readonly stream: kinesis.IStream;
   public readonly hose: firehose.CfnDeliveryStream;
 
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    this.stream = new kinesis.Stream(this, `Stream`);
+
     const hoseRole = new iam.Role(this, `FirehoseRole`, {
       assumedBy: new iam.ServicePrincipal('firehose.amazonaws.com'),
       managedPolicies: [
+        { managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonKinesisReadOnlyAccess' },
         { managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonKinesisFirehoseFullAccess' },
-        { managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonS3FullAccess' },
       ]
     });
 
@@ -45,8 +49,11 @@ export class KinesisStack extends cdk.Stack {
       { parameterName: 'NumberOfRetries', parameterValue: '1' },
     ];
     this.hose = new firehose.CfnDeliveryStream(this, `Firehose`, {
-      deliveryStreamName: 'amazon-apigateway-accessLog',
-      deliveryStreamType: 'DirectPut',
+      deliveryStreamType: 'KinesisStreamAsSource',
+      kinesisStreamSourceConfiguration: {
+        kinesisStreamArn: this.stream.streamArn,
+        roleArn: hoseRole.roleArn,
+      },
       extendedS3DestinationConfiguration: {
         bucketArn: bucket.bucketArn,
         roleArn: hoseRole.roleArn,
@@ -64,4 +71,5 @@ export class KinesisStack extends cdk.Stack {
       },
     });
   }
+
 }

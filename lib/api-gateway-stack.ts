@@ -1,13 +1,10 @@
-import * as path from 'path';
 import * as cdk from '@aws-cdk/core';
-import * as logs from '@aws-cdk/aws-logs';
-import * as lambda from '@aws-cdk/aws-lambda';
+import * as iam from '@aws-cdk/aws-iam';
 import * as apigw from '@aws-cdk/aws-apigateway';
-import * as firehose from '@aws-cdk/aws-kinesisfirehose';
-import { Code } from '@aws-cdk/aws-lambda';
+import * as kinesis from '@aws-cdk/aws-kinesis';
 
 interface Props extends cdk.StackProps {
-  hose: firehose.CfnDeliveryStream;
+  stream: kinesis.IStream;
 }
 
 export class ApiGatewayStack extends cdk.Stack {
@@ -18,37 +15,25 @@ export class ApiGatewayStack extends cdk.Stack {
 
     const ns =  scope.node.tryGetContext('ns');
 
-    const format = JSON.stringify({
-      "params": "$input.params()",
-      "body" : "$input.json('$')",
-      "stage" : apigw.AccessLogField.contextStage(),
-      "request_id": apigw.AccessLogField.contextRequestId(),
-      "resource_path": apigw.AccessLogField.contextResourcePath(),
-      "http_method": apigw.AccessLogField.contextHttpMethod(),
-      "source_ip": apigw.AccessLogField.contextIdentitySourceIp(),
-      "error": apigw.AccessLogField.contextErrorMessage(),
-      "user-agent": apigw.AccessLogField.contextIdentityUserAgent(),
-      "response_length": apigw.AccessLogField.contextResponseLength(),
-      "reponse_latency": apigw.AccessLogField.contextResponseLatency(),
-      "integration_latency": apigw.AccessLogField.contextIntegrationLatency(),
-    });
-    const hoseLogGroup = logs.LogGroup.fromLogGroupArn(this, `${ns}HoseLogGroup`, props.hose.attrArn);
     this.api = new apigw.RestApi(this, `${ns}RestApi`, {
       restApiName: `${ns}RestApi`,
       deploy: true,
       deployOptions: {
         stageName: 'dev',
-        accessLogDestination: new apigw.LogGroupLogDestination(hoseLogGroup),
-        accessLogFormat: apigw.AccessLogFormat.custom(format),
-        metricsEnabled: true,
-        dataTraceEnabled: true,
-        loggingLevel: apigw.MethodLoggingLevel.INFO,
+        loggingLevel: apigw.MethodLoggingLevel.ERROR,
       },
       endpointConfiguration: {
         types: [apigw.EndpointType.REGIONAL],
       },
     });
-    this.api.root.addMethod('ANY');
+
+    const credentialsRole = new iam.Role(this, `CredentialRole`, {
+      assumedBy: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      managedPolicies: [
+        { managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs' },
+        { managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonKinesisFullAccess' },
+      ],
+    });
 
     const resourceOptions: apigw.MethodOptions = {
       methodResponses: [
@@ -61,26 +46,51 @@ export class ApiGatewayStack extends cdk.Stack {
         }
       ],
     };
-    const f = new lambda.Function(this, `${ns}EchoFunction`, {
-      code: Code.fromAsset(path.resolve(__dirname, 'functions')),
-      handler: 'echo.handler',
-      runtime: lambda.Runtime.PYTHON_3_7,
-      timeout: cdk.Duration.seconds(3),
-    });
-    this.api.root.addMethod('GET', new apigw.LambdaIntegration(f, {
-      proxy: false,
-      passthroughBehavior: apigw.PassthroughBehavior.NEVER,
-      requestTemplates: {
-        'application/x-amz-json-1.1': JSON.stringify({
-          "text": "$input.params('text')",
-        }),
-        'application/json': JSON.stringify({
-          "text": "$input.params('text')",
-        }),
+
+    const dataFormat = `
+    #set($allParams = $input.params())
+    #set($params = $allParams.get('querystring'))
+    #set($data = "{
+      ""params"": {
+        #foreach($paramName in $params.keySet())
+        ""$paramName"": ""$util.escapeJavaScript($params.get($paramName))""
+        #if($foreach.hasNext),#end
+        #end
       },
-      integrationResponses: [
-        { statusCode: '200' }
-      ],
+      ""body"": $input.json('$'),
+      ""stage"": ""${apigw.AccessLogField.contextStage()}"",
+      ""http_method"": ""${apigw.AccessLogField.contextHttpMethod()}"",
+      ""request_id"": ""${apigw.AccessLogField.contextRequestId()}"",
+      ""resource_path"": ""${apigw.AccessLogField.contextResourcePath()}"",
+      ""resource_id"": ""${apigw.AccessLogField.contextResourceId()}"",
+      ""request_time"": ""${apigw.AccessLogField.contextRequestTime()}"",
+      ""source_ip"": ""${apigw.AccessLogField.contextIdentitySourceIp()}"",
+      ""user_agent"": ""${apigw.AccessLogField.contextIdentityUserAgent()}""
+    }")`.replace(/(\s{2,})|\n/gm, '');
+    this.api.root.addMethod('POST', new apigw.AwsIntegration({
+      proxy: false,
+      service: 'kinesis',
+      action: 'PutRecord',
+      integrationHttpMethod: 'POST',
+      options: {
+        credentialsRole,
+        passthroughBehavior: apigw.PassthroughBehavior.NEVER,
+        requestTemplates: {
+          'application/x-amz-json-1.1': dataFormat + JSON.stringify({
+            "StreamName": props.stream.streamName,
+            "PartitionKey": apigw.AccessLogField.contextRequestId(),
+            "Data": "$util.base64Encode($data)",
+          }),
+          'application/json': dataFormat + JSON.stringify({
+            "StreamName": props.stream.streamName,
+            "PartitionKey": apigw.AccessLogField.contextRequestId(),
+            "Data": "$util.base64Encode($data)",
+          }),
+        },
+        integrationResponses: [
+          { statusCode: '200' },
+        ],
+      },
     }), resourceOptions);
   }
 

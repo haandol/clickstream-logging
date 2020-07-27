@@ -12,6 +12,6 @@ const app = new cdk.App({
 });
 const kinesisStack = new KinesisStack(app, `${ns}KinesisStack`);
 const apigatewayStack = new ApiGatewayStack(app, `${ns}ApiGatewayStack`, {
-  hose: kinesisStack.hose,
+  stream: kinesisStack.stream,
 });
 apigatewayStack.addDependency(kinesisStack);
