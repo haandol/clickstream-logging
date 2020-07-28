@@ -59,7 +59,6 @@ export class ApiGatewayStack extends cdk.Stack {
       },
       ""body"": $input.json('$'),
       ""stage"": ""${apigw.AccessLogField.contextStage()}"",
-      ""http_method"": ""${apigw.AccessLogField.contextHttpMethod()}"",
       ""request_id"": ""${apigw.AccessLogField.contextRequestId()}"",
       ""resource_path"": ""${apigw.AccessLogField.contextResourcePath()}"",
       ""resource_id"": ""${apigw.AccessLogField.contextResourceId()}"",
