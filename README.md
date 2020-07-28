@@ -42,7 +42,7 @@ $ cdk deploy "*" --require-approval never
 1. Invoke API Gateway endpoint with some data (I used HTTPie)
 
 ```bash
-$ http post https://pc85vmongg.execute-api.ap-northeast-2.amazonaws.com/dev/\?param1\=test1\&param2\=test2 text=hihi dodo=dada 
+$ http post https://act1cqfmhh.execute-api.ap-northeast-2.amazonaws.com/dev/\?path\=/items/323\&param1\=value1\&param2\=value2 text=hihi dodo=dada
 
 HTTP/1.1 200 OK
 Connection: keep-alive
@@ -63,7 +63,7 @@ x-amzn-RequestId: 7b0c6ced-54f2-41a6-b6eb-67c34757f4ee
 2. Open S3 bucket to check if your data is stored well
 
 ```json
-{"params": {"param1": "test1","param2": "test2"},"body": {"text":"hihi","dodo":"dada"},"stage": "dev","http_method": "POST","request_id": "6408d828-bad6-4e48-8929-e23754591799","resource_path": "/","resource_id": "5ehbljoao8","request_time": "27/Jul/2020:12:22:06 +0000","source_ip": "39.115.51.138","user_agent": "HTTPie/2.1.0"}
+{"params": {"param1": "value1","param2": "value2","path": "\/items\/323"},"body": {"text":"hihi","dodo":"dada"},"stage": "dev","http_method": "POST","request_id": "7343872d-76d9-43cd-acf3-d67c414d06aa","resource_path": "/","resource_id": "qycjw0slz9","request_time": "28/Jul/2020:01:31:24 +0000","source_ip": "54.239.119.16","user_agent": "HTTPie/2.1.0"}
 ...
 ```
 
