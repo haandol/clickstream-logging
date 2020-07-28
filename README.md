@@ -71,7 +71,9 @@ x-amzn-RequestId: 7b0c6ced-54f2-41a6-b6eb-67c34757f4ee
 
 <img src="img/s3.png" />
 
-4. Query S3 with Amazon Athena
+4. Query S3 with Amazon Athena using Glue Crawler (with just few clicks)
+
+<img src="img/athena.png">
 
 # Cleanup Resource
 
