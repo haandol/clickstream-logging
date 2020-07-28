@@ -67,7 +67,11 @@ x-amzn-RequestId: 7b0c6ced-54f2-41a6-b6eb-67c34757f4ee
 ...
 ```
 
-3. Query S3 with Amazon Athena
+3. Check out S3 stored logs
+
+<img src="img/s3.png" />
+
+4. Query S3 with Amazon Athena
 
 # Cleanup Resource
 
