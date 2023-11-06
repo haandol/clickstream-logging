@@ -1,7 +1,8 @@
-import * as cdk from '@aws-cdk/core';
-import * as iam from '@aws-cdk/aws-iam';
-import * as apigw from '@aws-cdk/aws-apigateway';
-import * as kinesis from '@aws-cdk/aws-kinesis';
+import * as cdk from 'aws-cdk-lib/core';
+import { Construct } from 'constructs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as apigw from 'aws-cdk-lib/aws-apigateway';
+import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 
 interface Props extends cdk.StackProps {
   stream: kinesis.IStream;
@@ -10,10 +11,10 @@ interface Props extends cdk.StackProps {
 export class ApiGatewayStack extends cdk.Stack {
   public readonly api: apigw.RestApi;
 
-  constructor(scope: cdk.Construct, id: string, props: Props) {
+  constructor(scope: Construct, id: string, props: Props) {
     super(scope, id, props);
 
-    const ns =  scope.node.tryGetContext('ns');
+    const ns = scope.node.tryGetContext('ns');
 
     this.api = new apigw.RestApi(this, `${ns}RestApi`, {
       restApiName: `${ns}RestApi`,
@@ -30,7 +31,10 @@ export class ApiGatewayStack extends cdk.Stack {
     const credentialsRole = new iam.Role(this, `CredentialRole`, {
       assumedBy: new iam.ServicePrincipal('apigateway.amazonaws.com'),
       managedPolicies: [
-        { managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs' },
+        {
+          managedPolicyArn:
+            'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs',
+        },
         { managedPolicyArn: 'arn:aws:iam::aws:policy/AmazonKinesisFullAccess' },
       ],
     });
@@ -43,7 +47,7 @@ export class ApiGatewayStack extends cdk.Stack {
             'application/x-amz-json-1.1': apigw.Model.EMPTY_MODEL,
             'application/json': apigw.Model.EMPTY_MODEL,
           },
-        }
+        },
       ],
     };
 
@@ -66,31 +70,36 @@ export class ApiGatewayStack extends cdk.Stack {
       ""source_ip"": ""${apigw.AccessLogField.contextIdentitySourceIp()}"",
       ""user_agent"": ""${apigw.AccessLogField.contextIdentityUserAgent()}""
     }")`.replace(/(\s{2,})|\n/gm, '');
-    this.api.root.addMethod('POST', new apigw.AwsIntegration({
-      proxy: false,
-      service: 'kinesis',
-      action: 'PutRecord',
-      integrationHttpMethod: 'POST',
-      options: {
-        credentialsRole,
-        passthroughBehavior: apigw.PassthroughBehavior.NEVER,
-        requestTemplates: {
-          'application/x-amz-json-1.1': dataFormat + JSON.stringify({
-            "StreamName": props.stream.streamName,
-            "PartitionKey": apigw.AccessLogField.contextRequestId(),
-            "Data": "$util.base64Encode($data)",
-          }),
-          'application/json': dataFormat + JSON.stringify({
-            "StreamName": props.stream.streamName,
-            "PartitionKey": apigw.AccessLogField.contextRequestId(),
-            "Data": "$util.base64Encode($data)",
-          }),
+    this.api.root.addMethod(
+      'POST',
+      new apigw.AwsIntegration({
+        proxy: false,
+        service: 'kinesis',
+        action: 'PutRecord',
+        integrationHttpMethod: 'POST',
+        options: {
+          credentialsRole,
+          passthroughBehavior: apigw.PassthroughBehavior.NEVER,
+          requestTemplates: {
+            'application/x-amz-json-1.1':
+              dataFormat +
+              JSON.stringify({
+                StreamName: props.stream.streamName,
+                PartitionKey: apigw.AccessLogField.contextRequestId(),
+                Data: '$util.base64Encode($data)',
+              }),
+            'application/json':
+              dataFormat +
+              JSON.stringify({
+                StreamName: props.stream.streamName,
+                PartitionKey: apigw.AccessLogField.contextRequestId(),
+                Data: '$util.base64Encode($data)',
+              }),
+          },
+          integrationResponses: [{ statusCode: '200' }],
         },
-        integrationResponses: [
-          { statusCode: '200' },
-        ],
-      },
-    }), resourceOptions);
+      }),
+      resourceOptions
+    );
   }
-
 }

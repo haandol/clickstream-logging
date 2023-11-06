@@ -11,8 +11,8 @@ Running this tutorial will provision below architecture on your AWS Account
 # Prerequisites
 
 - awscli
-- Nodejs 10.20+
-- Python 3.7+
+- Nodejs 18+
+- Python 3.11
 - AWS Account and Locally configured AWS credential
 
 # Installation
@@ -26,7 +26,7 @@ $ npm i
 Install cdk in global context and run `cdk init` if you did not initailize cdk yet.
 
 ```bash
-$ npm i -g cdk@1.54.0
+$ npm i -g cdk@2.104.0
 $ cdk init
 $ cdk bootstrap
 ```
@@ -39,7 +39,7 @@ $ cdk deploy "*" --require-approval never
 
 # Usage
 
-1. Invoke API Gateway endpoint with some data (I used HTTPie)
+1. Invoke API Gateway endpoint with some data (I used [HTTPie](https://httpie.io/))
 
 ```bash
 $ http post https://act1cqfmhh.execute-api.ap-northeast-2.amazonaws.com/dev/\?path\=/items/323\&param1\=value1\&param2\=value2 text=hihi dodo=dada
