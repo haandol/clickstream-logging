@@ -51,7 +51,7 @@ export class KinesisStack extends cdk.Stack {
     const f = new lambda.Function(this, `ProcessorFunction`, {
       code: lambda.Code.fromAsset(path.resolve(__dirname, 'functions')),
       handler: 'processor.handler',
-      runtime: lambda.Runtime.PYTHON_3_7,
+      runtime: lambda.Runtime.PYTHON_3_11,
       timeout: cdk.Duration.minutes(5),
       role,
     });
