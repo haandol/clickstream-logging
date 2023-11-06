@@ -31,6 +31,9 @@ export class KinesisStack extends cdk.Stack {
     });
 
     const bucket = new s3.Bucket(this, `LogBucket`, {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      autoDeleteObjects: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     bucket.grantReadWrite(hoseRole);
